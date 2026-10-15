@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { 
+            font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif; 
+            background-color: #F3F3F3; 
+            color: #000; 
+            margin: 0; 
+            padding: 0; 
+            overflow: hidden; 
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #fff; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e0e0e0; border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #bdbdbd; }
+        
+        .sidebar { 
+            background: #FFFFFF; 
+            border-right: 1px solid #E5E5E5;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .slider-group { margin-bottom: 0.75rem; }
+        .slider-label { 
+            display: flex; justify-content: space-between; 
+            font-size: 0.65rem; text-transform: uppercase; 
+            letter-spacing: 0.05em; margin-bottom: 0.25rem; 
+            font-weight: 600; color: #333;
+        }
+
+        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
+        input[type=range]:focus { outline: none; }
+        input[type=range]::-webkit-slider-thumb { 
+            -webkit-appearance: none; height: 12px; width: 12px; 
+            border-radius: 50%; background: #000; cursor: pointer; 
+            margin-top: -5px; border: 2px solid #fff; box-shadow: 0 0 0 1px #000;
+        }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 2px; cursor: pointer; background: #E5E5E5; }
+
+        input[type=checkbox] { accent-color: #000; width: 14px; height: 14px; cursor: pointer; }
+        select { 
+            width: 100%; padding: 0.25rem; font-size: 0.7rem; border: 1px solid #E5E5E5; 
+            border-radius: 4px; outline: none; background: #fafafa;
+        }
+
+        .btn-primary { 
+            background: #000; color: #fff; padding: 0.75rem; text-align: center; 
+            cursor: pointer; text-transform: uppercase; font-size: 0.7rem; 
+            font-weight: 700; letter-spacing: 0.1em; transition: background 0.2s; 
+            border: none; width: 100%; margin-bottom: 0.5rem; border-radius: 4px;
+        }
+        .btn-primary:hover { background: #333; }
+        .btn-primary:disabled { background: #888; cursor: not-allowed; }
+
+        .btn-secondary {
+            background: #fff; color: #000; border: 1px solid #000; padding: 0.5rem; 
+            text-align: center; cursor: pointer; text-transform: uppercase; 
+            font-size: 0.65rem; font-weight: 700; letter-spacing: 0.1em; 
+            transition: all 0.2s; width: 100%; border-radius: 4px;
+        }
+        .btn-secondary:hover { background: #f0f0f0; }
+
+        .section-title {
+            font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.1em;
+            font-weight: 700; margin-bottom: 0.5rem; margin-top: 1rem; color: #888;
+            border-bottom: 1px solid #E5E5E5; padding-bottom: 0.25rem;
+        }
+
+        #canvas-container { position: relative; width: 100%; height: 100vh; background: #F3F3F3; overflow: hidden; }
+        canvas { display: block; width: 100%; height: 100%; }
+
+        .stats-panel { padding: 1rem 1.5rem; border-top: 1px solid #E5E5E5; background: #FAFAFA; font-size: 0.7rem; flex-shrink: 0; }
+        .stat-item { display: flex; justify-content: space-between; margin-bottom: 0.35rem; border-bottom: 1px dotted #e0e0e0; padding-bottom: 0.2rem; }
+        .stat-item span:last-child { font-weight: 600; font-family: monospace; font-size: 0.75rem; }
+
+        #loading-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.8); display: flex; flex-direction: column;
+            justify-content: center; align-items: center; z-index: 50; display: none;
+        }
+        .spinner { border: 3px solid #f3f3f3; border-top: 3px solid #000; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="flex w-full">
+
+<!-- UI Sidebar -->
+<div class="sidebar w-80 flex-shrink-0 z-10 shadow-sm">
+    <div class="p-5 flex-shrink-0 border-b border-gray-200">
+        <button id="generateBtn" class="btn-primary">Generate Layout</button>
+        <button id="randomSeedBtn" class="btn-secondary">Randomize Seed</button>
+        <div class="flex justify-between items-center mt-3 text-xs uppercase tracking-widest font-bold text-gray-500">
+            <span>Seed</span><span id="seedDisplay" class="text-black text-sm font-mono">42</span>
+        </div>
+    </div>
+
+    <div class="flex-grow overflow-y-auto p-5 custom-scrollbar">
+        <div class="section-title">Grid & Canvas</div>
+        <div class="slider-group"><div class="slider-label"><span>Grid Size</span><span id="g_size_val">1.0</span></div><input type="range" id="g_size" min="1.0" max="3.0" step="0.1" value="1.0"></div>
+        <div class="slider-group"><div class="slider-label"><span>W</span><span id="b_w_val">50</span></div><input type="range" id="b_w" min="20" max="100" step="1" value="50"></div>
+        <div class="slider-group"><div class="slider-label"><span>H</span><span id="b_h_val">50</span></div><input type="range" id="b_h" min="20" max="100" step="1" value="50"></div>
+        <div class="flex justify-between items-center mt-3 mb-2">
+            <span class="text-[0.65rem] font-bold uppercase tracking-widest text-gray-700">Force Rect</span>
+            <input type="checkbox" id="force_rect">
+        </div>
+
+        <div class="section-title">Generation Params</div>
+        <div class="slider-group"><div class="slider-label"><span>Iters</span><span id="iters_val">150</span></div><input type="range" id="iters" min="1" max="1000" step="1" value="150"></div>
+        <div class="slider-group"><div class="slider-label"><span>Spine Type</span><span id="spine_type_val">5</span></div><input type="range" id="spine_type" min="0" max="5" step="1" value="5"></div>
+        <div class="slider-group"><div class="slider-label"><span>Entrance Dir</span><span id="entrance_dir_val">5</span></div><input type="range" id="entrance_dir" min="0" max="5" step="1" value="5"></div>
+        <div class="slider-group">
+            <div class="slider-label"><span>View Dir</span></div>
+            <select id="view_dir">
+                <option value="0">0 - North</option>
+                <option value="1">1 - East</option>
+                <option value="2">2 - South</option>
+                <option value="3">3 - West</option>
+                <option value="4" selected>4 - Random</option>
+            </select>
+        </div>
+        <div class="slider-group mt-2"><div class="slider-label"><span>Max Dist</span><span id="max_dist_val">25</span></div><input type="range" id="max_dist" min="10" max="50" step="1" value="25"></div>
+
+        <div class="section-title">Program - Units</div>
+        <div class="slider-group"><div class="slider-label"><span>N Units</span><span id="n_units_val">4</span></div><input type="range" id="n_units" min="1" max="12" step="1" value="4"></div>
+        <div class="slider-group"><div class="slider-label"><span>Unit Area</span><span id="u_area_val">120</span></div><input type="range" id="u_area" min="50" max="300" step="5" value="120"></div>
+        <div class="slider-group"><div class="slider-label"><span>Unit Aspect Max</span><span id="u_aspect_max_val">1.8</span></div><input type="range" id="u_aspect_max" min="1.0" max="3.0" step="0.1" value="1.8"></div>
+        
+        <div class="section-title">Program - Core</div>
+        <div class="slider-group"><div class="slider-label"><span>N Pass Elev</span><span id="n_pass_elev_val">4</span></div><input type="range" id="n_pass_elev" min="1" max="8" step="1" value="4"></div>
+        <div class="slider-group"><div class="slider-label"><span>Elev W</span><span id="e_w_val">3</span></div><input type="range" id="e_w" min="2" max="6" step="1" value="3"></div>
+        <div class="slider-group"><div class="slider-label"><span>Elev D</span><span id="e_d_val">3</span></div><input type="range" id="e_d" min="2" max="6" step="1" value="3"></div>
+        <div class="slider-group"><div class="slider-label"><span>N Reg Stair</span><span id="n_reg_stair_val">1</span></div><input type="range" id="n_reg_stair" min="1" max="4" step="1" value="1"></div>
+        <div class="slider-group"><div class="slider-label"><span>N Em Elev</span><span id="n_em_elev_val">1</span></div><input type="range" id="n_em_elev" min="0" max="4" step="1" value="1"></div>
+        <div class="slider-group"><div class="slider-label"><span>N Esc Stair</span><span id="n_esc_stair_val">1</span></div><input type="range" id="n_esc_stair" min="0" max="4" step="1" value="1"></div>
+        <div class="slider-group"><div class="slider-label"><span>Stair W</span><span id="s_w_val">3</span></div><input type="range" id="s_w" min="2" max="5" step="1" value="3"></div>
+        <div class="slider-group"><div class="slider-label"><span>Stair D</span><span id="s_d_val">6</span></div><input type="range" id="s_d" min="4" max="10" step="1" value="6"></div>
+        <div class="slider-group"><div class="slider-label"><span>Lobby W</span><span id="l_w_val">3</span></div><input type="range" id="l_w" min="2" max="8" step="1" value="3"></div>
+        <div class="slider-group"><div class="slider-label"><span>Lobby D</span><span id="l_d_val">3</span></div><input type="range" id="l_d" min="2" max="8" step="1" value="3"></div>
+        <div class="slider-group"><div class="slider-label"><span>MEP Area</span><span id="mep_area_val">15</span></div><input type="range" id="mep_area" min="0" max="50" step="5" value="15"></div>
+
+        <div class="section-title">Weights</div>
+        <div class="slider-group"><div class="slider-label"><span>W Struct</span><span id="w_struct_val">1.0</span></div><input type="range" id="w_struct" min="0.1" max="5.0" step="0.1" value="1.0"></div>
+        <div class="slider-group"><div class="slider-label"><span>W Circ</span><span id="w_circ_val">1.0</span></div><input type="range" id="w_circ" min="0.1" max="5.0" step="0.1" value="1.0"></div>
+        <div class="slider-group"><div class="slider-label"><span>W Clim</span><span id="w_clim_val">1.0</span></div><input type="range" id="w_clim" min="0.1" max="5.0" step="0.1" value="1.0"></div>
+    </div>
+
+    <div class="stats-panel z-20">
+        <div class="uppercase text-[0.65rem] font-bold mb-3 tracking-widest text-gray-500">Metrics Dashboard</div>
+        <div id="scoreStats" class="mb-3"></div>
+        <div class="uppercase text-[0.65rem] font-bold mb-2 tracking-widest text-gray-500">Egress Distance (Units)</div>
+        <div id="unitStats" class="max-h-24 overflow-y-auto custom-scrollbar pr-2"></div>
+    </div>
+</div>
+
+<!-- Canvas Container -->
+<div id="canvas-container" class="flex-grow">
+    <div id="loading-overlay">
+        <div class="spinner mb-3"></div>
+        <div class="text-xs font-bold tracking-widest uppercase text-gray-600">Generating Architecture...</div>
+        <div id="loading-progress" class="text-xs mt-1 text-gray-400 font-mono"></div>
+    </div>
+    <canvas id="mainCanvas"></canvas>
+</div>
+
+<script>
+    // --- 1. JS Seeded Random Generator ---
+    class Random {
+        constructor(seed) { this.state = seed ? seed : 42; }
+        next() {
+            this.state = (this.state * 9301 + 49297) % 233280;
+            return this.state / 233280;
+        }
+        nextInt(min, max) { return Math.floor(this.next() * (max - min + 1)) + min; }
+        choice(arr) { return arr[Math.floor(this.next() * arr.length)]; }
+        shuffle(arr) {
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(this.next() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+        }
+    }
+
+    let currentSeed = Math.floor(Math.random() * 10000);
+    let rng = new Random(currentSeed);
+    document.getElementById('seedDisplay').innerText = currentSeed;
+
+    // --- 2. OOP Classes ---
+    class Room {
+        constructor(x, y, w, h, rid, name) {
+            this.x = x; this.y = y; this.w = w; this.h = h; this.rid = rid; this.name = name;
+        }
+        expand(dx, dy, dw, dh) {
+            this.x += dx; this.y += dy; this.w += dw; this.h += dh;
+        }
+        clone() { return new Room(this.x, this.y, this.w, this.h, this.rid, this.name); }
+    }
+
+    class LayoutState {
+        constructor(cols, rows) {
+            this.cols = cols;
+            this.rows = rows;
+            this.matrix = Array.from({length: rows}, () => new Array(cols).fill(0));
+            this.rooms = [];
+            this.score = -Infinity;
+            this.score_details = [0, 0, 0];
+            this.core_center = [0, 0];
+            this.unit_distances = [];
+            this.unit_names = [];
+        }
+        clone() {
+            let ns = new LayoutState(this.cols, this.rows);
+            for(let y=0; y<this.rows; y++) {
+                ns.matrix[y] = [...this.matrix[y]];
+            }
+            ns.rooms = this.rooms.map(r => r.clone());
+            ns.score = this.score;
+            ns.score_details = [...this.score_details];
+            ns.core_center = [...this.core_center];
+            ns.unit_distances = [...this.unit_distances];
+            ns.unit_names = [...this.unit_names];
+            return ns;
+        }
+    }
+
+    // --- 3. Core Helpers ---
+    function isFree(mat, cols, rows, gx, gy, gw, gh) {
+        if (gx < 0 || gy < 0 || gx + gw > cols || gy + gh > rows) return false;
+        for (let y = gy; y < gy + gh; y++) {
+            for (let x = gx; x < gx + gw; x++) {
+                if (mat[y][x] !== 0) return false;
+            }
+        }
+        return true;
+    }
+
+    function touchesSpecific(mat, cols, rows, gx, gy, gw, gh, target_ids, min_len=1) {
+        let count = 0;
+        for (let y = gy; y < gy + gh; y++) {
+            if (gx > 0 && target_ids.includes(mat[y][gx - 1])) { count++; if(count >= min_len) return true; }
+            if (gx + gw < cols && target_ids.includes(mat[y][gx + gw])) { count++; if(count >= min_len) return true; }
+        }
+        for (let x = gx; x < gx + gw; x++) {
+            if (gy > 0 && target_ids.includes(mat[gy - 1][x])) { count++; if(count >= min_len) return true; }
+            if (gy + gh < rows && target_ids.includes(mat[gy + gh][x])) { count++; if(count >= min_len) return true; }
+        }
+        return false;
+    }
+
+    function countContactEdges(mat, cols, rows, gx, gy, gw, gh) {
+        let count = 0;
+        for (let y = gy; y < gy + gh; y++) {
+            if (gx > 0 && mat[y][gx - 1] !== 0) count++;
+            if (gx + gw < cols && mat[y][gx + gw] !== 0) count++;
+        }
+        for (let x = gx; x < gx + gw; x++) {
+            if (gy > 0 && mat[gy - 1][x] !== 0) count++;
+            if (gy + gh < rows && mat[gy + gh][x] !== 0) count++;
+        }
+        return count;
+    }
+
+    function placeRoom(state, gx, gy, gw, gh, rid, name) {
+        for (let y = gy; y < gy + gh; y++) {
+            for (let x = gx; x < gx + gw; x++) {
+                state.matrix[y][x] = rid;
+            }
+        }
+        state.rooms.push(new Room(gx, gy, gw, gh, rid, name));
+    }
+
+    function getRotatedBlocks(parts, bw, bh) {
+        let vars = [];
+        for (let rot = 0; rot < 4; rot++) {
+            let nParts = [];
+            let nbw, nbh;
+            if (rot === 0) {
+                nbw = bw; nbh = bh;
+                for(let p of parts) nParts.push([...p]);
+            } else if (rot === 1) {
+                nbw = bh; nbh = bw;
+                for(let p of parts) nParts.push([nbw - p[1] - p[3], p[0], p[3], p[2], p[4], p[5]]);
+            } else if (rot === 2) {
+                nbw = bw; nbh = bh;
+                for(let p of parts) nParts.push([nbw - p[0] - p[2], nbh - p[1] - p[3], p[2], p[3], p[4], p[5]]);
+            } else if (rot === 3) {
+                nbw = bh; nbh = bw;
+                for(let p of parts) nParts.push([p[1], nbh - p[0] - p[2], p[3], p[2], p[4], p[5]]);
+            }
+            vars.push({parts: nParts, bw: nbw, bh: nbh});
+        }
+        return vars;
+    }
+
+    // --- 4. Evaluation Algorithm ---
+    function evaluateLayout(state, cols, rows, g_size, max_dist, w_struct, w_circ, w_clim, force_rect, min_unit_door_c, view_dir) {
+        let s_struct = 0, s_circ = 0, s_clim = 0;
+        let [cc_x, cc_y] = state.core_center;
+        
+        let rmin_x = Infinity, rmin_y = Infinity, rmax_x = -Infinity, rmax_y = -Infinity;
+        let non_balc = state.rooms.filter(r => r.rid !== 10);
+        
+        for (let r of non_balc) {
+            if (r.x < rmin_x) rmin_x = r.x;
+            if (r.y < rmin_y) rmin_y = r.y;
+            if (r.x + r.w > rmax_x) rmax_x = r.x + r.w;
+            if (r.y + r.h > rmax_y) rmax_y = r.y + r.h;
+        }
+        
+        let bb_w = rmax_x - rmin_x;
+        let bb_h = rmax_y - rmin_y;
+        if (bb_w <= 0 || bb_h <= 0) return [-Infinity, [0,0,0]];
+        
+        let aspect = Math.max(bb_w, bb_h) / Math.max(1, Math.min(bb_w, bb_h));
+        if (aspect > 1.5) s_struct -= Math.pow(aspect - 1.5, 2) * 200;
+        
+        let bb_cx = rmin_x + bb_w / 2.0;
+        let bb_cy = rmin_y + bb_h / 2.0;
+        s_struct -= (Math.abs(bb_cx - cc_x) + Math.abs(bb_cy - cc_y)) * 60;
+        
+        let core_rooms = state.rooms.filter(r => [1,2,3,6,7,8,9].includes(r.rid));
+        if (core_rooms.length > 0) {
+            let cminx = Math.min(...core_rooms.map(r=>r.x)), cmaxx = Math.max(...core_rooms.map(r=>r.x+r.w));
+            let cminy = Math.min(...core_rooms.map(r=>r.y)), cmaxy = Math.max(...core_rooms.map(r=>r.y+r.h));
+            let bbA = (cmaxx - cminx) * (cmaxy - cminy);
+            let actA = core_rooms.reduce((acc, r) => acc + r.w * r.h, 0);
+            s_struct -= (bbA - actA) * 15;
+        }
+        
+        let stairs = state.rooms.filter(r => [3,7].includes(r.rid));
+        if (stairs.length >= 2) {
+            let sDists = [];
+            for (let i=0; i<stairs.length; i++) {
+                for (let j=i+1; j<stairs.length; j++) {
+                    let cx1 = stairs[i].x + stairs[i].w/2, cy1 = stairs[i].y + stairs[i].h/2;
+                    let cx2 = stairs[j].x + stairs[j].w/2, cy2 = stairs[j].y + stairs[j].h/2;
+                    sDists.push(Math.abs(cx1-cx2) + Math.abs(cy1-cy2));
+                }
+            }
+            let minS = Math.min(...sDists);
+            let req = Math.max(bb_w, bb_h) * 0.3;
+            if (minS < req) s_struct -= (req - minS) * 40;
+        }
+        
+        let lobs = state.rooms.filter(r => r.rid === 1);
+        let emcs = state.rooms.filter(r => [6,8].includes(r.rid));
+        if (lobs.length && emcs.length) {
+            let lx = lobs[0].x + lobs[0].w/2, ly = lobs[0].y + lobs[0].h/2;
+            let ex = emcs[0].x + emcs[0].w/2, ey = emcs[0].y + emcs[0].h/2;
+            s_circ += (Math.abs(lx-ex) + Math.abs(ly-ey)) * 8;
+        }
+        
+        let exp = 0;
+        for (let y=0; y<rows; y++) {
+            for (let x=0; x<cols; x++) {
+                if ([3,5,7].includes(state.matrix[y][x])) {
+                    if (x===0 || state.matrix[y][x-1]===0) exp++;
+                    if (x===cols-1 || state.matrix[y][x+1]===0) exp++;
+                    if (y===0 || state.matrix[y-1][x]===0) exp++;
+                    if (y===rows-1 || state.matrix[y+1][x]===0) exp++;
+                }
+            }
+        }
+        s_clim += exp * 15;
+        
+        let bbArea = bb_w * bb_h;
+        let actArea = non_balc.reduce((acc, r) => acc + r.w * r.h, 0);
+        s_struct -= (bbArea - actArea) * 5;
+        if (force_rect && (bbArea - actArea > 0)) s_struct -= (bbArea - actArea) * 10000;
+        
+        for (let r of state.rooms) {
+            if (r.rid === 10) {
+                let p = r.name.split('_');
+                let pdir = parseInt(p[p.length-1]);
+                if (pdir === view_dir) s_clim += 150;
+                else if (Math.abs(pdir - view_dir) % 2 === 1) s_clim += 50;
+                else s_clim -= 50;
+            }
+        }
+        
+        // BFS distances
+        let dists = Array.from({length: rows}, () => new Array(cols).fill(Infinity));
+        let q = [];
+        let scx = Math.floor(cc_x), scy = Math.floor(cc_y);
+        if(scx >= 0 && scx < cols && scy >= 0 && scy < rows) {
+            dists[scy][scx] = 0;
+            q.push([scx, scy]);
+        }
+        
+        while (q.length > 0) {
+            let [cx, cy] = q.shift();
+            for (let [dx, dy] of [[0,1], [0,-1], [1,0], [-1,0]]) {
+                let nx = cx + dx, ny = cy + dy;
+                if (nx >= 0 && nx < cols && ny >= 0 && ny < rows) {
+                    if ([1, 5].includes(state.matrix[ny][nx]) && dists[ny][nx] === Infinity) {
+                        dists[ny][nx] = dists[cy][cx] + 1;
+                        q.push([nx, ny]);
+                    }
+                }
+            }
+        }
+        
+        let uDists = [], partyW = 0, uArea = 0, lArea = 0;
+        state.unit_distances = [];
+        state.unit_names = [];
+
+        for (let r of state.rooms) {
+            if (r.rid === 1) lArea += r.w * r.h;
+            else if (r.rid === 4) {
+                uArea += r.w * r.h;
+                let ucx = Math.floor(r.x + r.w/2), ucy = Math.floor(r.y + r.h/2);
+                
+                for (let x=r.x; x<r.x+r.w; x++) {
+                    if (r.y>0 && state.matrix[r.y-1][x]===4) partyW++;
+                    if (r.y+r.h<rows && state.matrix[r.y+r.h][x]===4) partyW++;
+                }
+                for (let y=r.y; y<r.y+r.h; y++) {
+                    if (r.x>0 && state.matrix[y][r.x-1]===4) partyW++;
+                    if (r.x+r.w<cols && state.matrix[y][r.x+r.w]===4) partyW++;
+                }
+                
+                let adjs = [];
+                for (let y=r.y; y<r.y+r.h; y++) {
+                    if (r.x>0 && state.matrix[y][r.x-1]===5) adjs.push([r.x-1, y]);
+                    if (r.x+r.w<cols && state.matrix[y][r.x+r.w]===5) adjs.push([r.x+r.w, y]);
+                }
+                for (let x=r.x; x<r.x+r.w; x++) {
+                    if (r.y>0 && state.matrix[r.y-1][x]===5) adjs.push([x, r.y-1]);
+                    if (r.y+r.h<rows && state.matrix[r.y+r.h][x]===5) adjs.push([x, r.y+r.h]);
+                }
+                
+                let minD = Infinity;
+                for (let [ax, ay] of adjs) {
+                    if (dists[ay][ax] !== Infinity) {
+                        let d = dists[ay][ax] + Math.abs(ucx - ax) + Math.abs(ucy - ay);
+                        if (d < minD) minD = d;
+                    }
+                }
+                
+                if (minD === Infinity) {
+                    s_circ -= 1000;
+                } else {
+                    uDists.push(minD);
+                    state.unit_distances.push(minD * g_size);
+                    state.unit_names.push(r.name);
+                }
+                
+                let en=0, es=0, ee=0, ew=0;
+                for (let x=r.x; x<r.x+r.w; x++) {
+                    if (r.y+r.h>=rows || [0,10].includes(state.matrix[r.y+r.h][x])) en++;
+                    if (r.y-1<0 || [0,10].includes(state.matrix[r.y-1][x])) es++;
+                }
+                for (let y=r.y; y<r.y+r.h; y++) {
+                    if (r.x+r.w>=cols || [0,10].includes(state.matrix[y][r.x+r.w])) ee++;
+                    if (r.x-1<0 || [0,10].includes(state.matrix[y][r.x-1])) ew++;
+                }
+                let hn=en>0, hs=es>0, he=ee>0, hw=ew>0;
+                let expSides = (hn?1:0)+(hs?1:0)+(he?1:0)+(hw?1:0);
+                
+                if (expSides===1) s_clim -= 50;
+                else if ((hn&&hs) || (he&&hw)) s_clim += 150;
+                else if (expSides>=2) s_clim += 50;
+                if (expSides===1 && hw) s_clim -= 800;
+                s_clim += es*10 + ee*5 - ew*5;
+            }
+        }
+        
+        if (uDists.length > 0) {
+            for (let d of uDists) if (d > max_dist) s_circ -= (d - max_dist)*50;
+            s_circ -= (Math.max(...uDists) - Math.min(...uDists)) * 30;
+        }
+        
+        let cArea = 0;
+        for(let y=0; y<rows; y++) for(let x=0; x<cols; x++) if(state.matrix[y][x]===5) cArea++;
+        
+        let tCirc = uArea + cArea + lArea;
+        if (tCirc > 0) {
+            let eff = (uArea / tCirc) * 100;
+            if (eff < 75) s_circ -= (75 - eff) * 50;
+        }
+        s_circ += partyW * 20;
+        
+        let t = 1000 + (w_struct * s_struct) + (w_circ * s_circ) + (w_clim * s_clim);
+        return [t, [w_struct*s_struct, w_circ*s_circ, w_clim*s_clim]];
+    }
+
+    // --- 5. Async Generation Loop ---
+    async function runAlgorithmAsync(p) {
+        rng = new Random(p.seed);
+        let g_size = p.g_size <= 0.01 ? 1.0 : p.g_size;
+        let toCells = v => Math.max(1, Math.ceil(v / g_size));
+        
+        let cols = toCells(p.b_w), rows = toCells(p.b_h);
+        let ew_c = toCells(p.e_w), ed_c = toCells(p.e_d);
+        let sw_c = toCells(p.s_w), sd_c = toCells(p.s_d);
+        let c_w = toCells(2.0), in_lw_c = toCells(p.l_w), lobby_depth_c = toCells(p.l_d);
+        let min_unit_door_c = Math.max(1, Math.ceil(2.0 / g_size));
+        let bal_d_c = Math.max(1, Math.ceil(2.0 / g_size));
+
+        // Resolve Random View Dir
+        let actual_view = p.view_dir;
+        if (actual_view === 4) actual_view = rng.nextInt(0, 3);
+
+        let mParts = [];
+        let m_bw, m_bh;
+        if (p.n_pass_elev <= 3) {
+            let el_w = p.n_pass_elev * ew_c;
+            let lw = Math.max(el_w, in_lw_c);
+            let eOff = Math.floor((lw - el_w) / 2);
+            for(let i=0; i<p.n_pass_elev; i++) mParts.push([eOff + i*ew_c, 0, ew_c, ed_c, 2, `Pass_Elev_${i+1}`]);
+            mParts.push([0, ed_c, lw, lobby_depth_c, 1, "Lobby"]);
+            m_bw = lw; m_bh = ed_c + lobby_depth_c;
+        } else {
+            let npr = Math.floor((p.n_pass_elev + 1) / 2);
+            let el_w = npr * ew_c;
+            let lw = Math.max(el_w, in_lw_c);
+            let eOff = Math.floor((lw - el_w) / 2);
+            for(let i=0; i<npr; i++) mParts.push([eOff + i*ew_c, 0, ew_c, ed_c, 2, `Pass_Elev_${i+1}`]);
+            mParts.push([0, ed_c, lw, lobby_depth_c, 1, "Lobby"]);
+            for(let i=0; i<p.n_pass_elev - npr; i++) mParts.push([eOff + i*ew_c, ed_c + lobby_depth_c, ew_c, ed_c, 2, `Pass_Elev_${i+1+npr}`]);
+            m_bw = lw; m_bh = ed_c * 2 + lobby_depth_c;
+        }
+        let mVars = getRotatedBlocks(mParts, m_bw, m_bh);
+        
+        let eParts = [ [0,0,ew_c,ed_c,8,"Smoke_Vestibule"], [ew_c,0,ew_c,ed_c,6,"EM_Elev_1"] ];
+        let eVars = getRotatedBlocks(eParts, ew_c * 2, ed_c);
+
+        let sQ = [];
+        for(let i=0; i<p.n_reg_stair; i++) sQ.push([sw_c, sd_c, 3, `Reg_Stair_${i+1}`]);
+        for(let i=0; i<p.n_esc_stair; i++) sQ.push([sw_c, sd_c, 7, `Esc_Stair_${i+1}`]);
+
+        let buildUQ = (area, n, amax, rid, pfx) => {
+            let c = Math.max(1, Math.ceil(area / (g_size*g_size)));
+            let opts = [];
+            for (let w=1; w<=c+2; w++) {
+                for (let h=1; h<=c+2; h++) {
+                    if (w*h >= c && w*h <= c + Math.max(2, Math.floor(c*0.15))) {
+                        let asp = Math.max(w,h)/Math.min(w,h);
+                        if(asp >= 1.0 && asp <= amax) opts.push([w,h]);
+                    }
+                }
+            }
+            if(opts.length === 0) {
+                let s = Math.max(1, Math.floor(Math.sqrt(c)));
+                opts.push([s, Math.ceil(c/s)]);
+            }
+            let q = [];
+            for(let i=0; i<n; i++) q.push([opts, rid, `${pfx}_${i+1}`]);
+            return q;
+        };
+        let uQ = buildUQ(p.u_area, p.n_units, p.u_aspect_max, 4, "Unit");
+
+        let buildSQ = (area, rid, pfx) => {
+            let c = Math.max(0, Math.ceil(area / (g_size*g_size)));
+            if(c===0) return [];
+            let pts = c>12 ? [Math.floor(c/2), c - Math.floor(c/2)] : [c];
+            let q = [];
+            for(let i=0; i<pts.length; i++) {
+                let pc = pts[i];
+                let opts = [];
+                for(let w=1; w<=pc+2; w++) {
+                    for(let h=1; h<=pc+2; h++) {
+                        if (w*h >= pc && w*h <= pc + Math.max(2, Math.floor(pc*0.25))) {
+                            if(Math.max(w,h)/Math.min(w,h) <= 4.0) opts.push([w,h]);
+                        }
+                    }
+                }
+                if(opts.length===0){
+                    let s = Math.max(1, Math.floor(Math.sqrt(pc)));
+                    opts.push([s, Math.ceil(pc/s)]);
+                }
+                q.push([opts, rid, `${pfx}_${i+1}`]);
+            }
+            return q;
+        };
+        let mepQ = buildSQ(p.mep_area, 9, "MEP_Space");
+
+        let bestGS = null, currS = null, T = 1000.0, cRate = 0.95;
+        let maxUD = uQ.length > 0 ? Math.max(...uQ[0][0].map(o => Math.max(o[0], o[1]))) : 5;
+
+        // Async loop
+        for (let step = 0; step < p.iters; step++) {
+            // UI yield
+            if (step % 25 === 0) {
+                document.getElementById('loading-progress').innerText = `Iteration ${step} / ${p.iters} ...`;
+                await new Promise(r => setTimeout(r, 0)); 
+            }
+
+            let s = new LayoutState(cols, rows);
+            let ok = true;
+
+            // Ph 1: Spine
+            let cx = Math.floor(cols/2), cy = Math.floor(rows/2);
+            let buf = maxUD + 1;
+            let dRect = (x,y,w,h) => {
+                for(let iy=y; iy<y+h; iy++) for(let ix=x; ix<x+w; ix++) {
+                    if(iy>=0 && iy<rows && ix>=0 && ix<cols) s.matrix[iy][ix] = 5;
+                }
+            };
+            let rot = rng.nextInt(0, 3);
+            let aSpine = p.spine_type === 5 ? rng.nextInt(0, 4) : p.spine_type;
+            
+            let dN = ()=>dRect(cx - Math.floor(c_w/2), buf, c_w, cy - buf + Math.floor(c_w/2));
+            let dS = ()=>dRect(cx - Math.floor(c_w/2), cy - Math.floor(c_w/2), c_w, rows - cy - buf + Math.floor(c_w/2));
+            let dW = ()=>dRect(buf, cy - Math.floor(c_w/2), cx - buf + Math.floor(c_w/2), c_w);
+            let dE = ()=>dRect(cx - Math.floor(c_w/2), cy - Math.floor(c_w/2), cols - cx - buf + Math.floor(c_w/2), c_w);
+
+            if (aSpine === 0) { if(rot%2===0) {dW(); dE();} else {dN(); dS();} }
+            else if (aSpine === 1) { if(rot===0){dN(); dE();} else if(rot===1){dE(); dS();} else if(rot===2){dS(); dW();} else {dW(); dN();} }
+            else if (aSpine === 2) { if(rot===0){dW(); dN(); dE();} else if(rot===1){dN(); dE(); dS();} else if(rot===2){dE(); dS(); dW();} else {dS(); dW(); dN();} }
+            else if (aSpine === 3) { dN(); dS(); dW(); dE(); }
+            else if (aSpine >= 4) {
+                if(rot%2===0){ dRect(buf, buf, c_w, rows - 2*buf); dRect(cols-buf-c_w, buf, c_w, rows - 2*buf); dRect(buf+c_w, cy-Math.floor(c_w/2), cols-2*buf-2*c_w, c_w); }
+                else { dRect(buf, buf, cols-2*buf, c_w); dRect(buf, rows-buf-c_w, cols-2*buf, c_w); dRect(cx-Math.floor(c_w/2), buf+c_w, c_w, rows-2*buf-2*c_w); }
+            }
+
+            // Ph 2: Main Core
+            let vMain = [];
+            for(let y=0; y<rows; y++) {
+                for(let x=0; x<cols; x++) {
+                    for(let mv of mVars) {
+                        if (isFree(s.matrix, cols, rows, x, y, mv.bw, mv.bh)) {
+                            let lv = false, lcx = x, lcy = y;
+                            for (let pt of mv.parts) {
+                                if (pt[4] === 1) {
+                                    let gx = x+pt[0], gy = y+pt[1], gw = pt[2], gh = pt[3];
+                                    lcx = gx + gw/2; lcy = gy + gh/2;
+                                    let tN=0, tS=0, tW=0, tE=0;
+                                    for(let nx=gx; nx<gx+gw; nx++) {
+                                        if(gy>0 && s.matrix[gy-1][nx]===5) tN++;
+                                        if(gy+gh<rows && s.matrix[gy+gh][nx]===5) tS++;
+                                    }
+                                    for(let ny=gy; ny<gy+gh; ny++) {
+                                        if(gx>0 && s.matrix[ny][gx-1]===5) tW++;
+                                        if(gx+gw<cols && s.matrix[ny][gx+gw]===5) tE++;
+                                    }
+                                    let sl = Math.min(gw, gh);
+                                    if ((gw===sl && (tN===gw || tS===gw)) || (gh===sl && (tW===gh || tE===gh))) lv = true;
+                                }
+                            }
+                            if (lv) vMain.push({x:x, y:y, p:mv.parts, bw:mv.bw, bh:mv.bh, dist: Math.abs(lcx-cx)+Math.abs(lcy-cy)});
+                        }
+                    }
+                }
+            }
+            if(!vMain.length) continue;
+
+            if (p.entrance_dir === 0) vMain.sort((a,b) => -a.x === -b.x ? a.dist - b.dist : -a.x - -b.x);
+            else if (p.entrance_dir === 1) vMain.sort((a,b) => a.y === b.y ? a.dist - b.dist : a.y - b.y);
+            else if (p.entrance_dir === 2) vMain.sort((a,b) => a.x === b.x ? a.dist - b.dist : a.x - b.x);
+            else if (p.entrance_dir === 3) vMain.sort((a,b) => -a.y === -b.y ? a.dist - b.dist : -a.y - -b.y);
+            else if (p.entrance_dir === 4) vMain.sort((a,b) => (Math.abs(a.x+a.bw/2-cx)+Math.abs(a.y+a.bh/2-cy)+a.dist*0.5) - (Math.abs(b.x+b.bw/2-cx)+Math.abs(b.y+b.bh/2-cy)+b.dist*0.5));
+            else { rng.shuffle(vMain); vMain.sort((a,b) => a.dist - b.dist); }
+
+            let selM = rng.choice(vMain.slice(0, Math.max(1, Math.floor(vMain.length/4))));
+            for(let pt of selM.p) placeRoom(s, selM.x+pt[0], selM.y+pt[1], pt[2], pt[3], pt[4], pt[5]);
+            s.core_center = [selM.x + selM.bw/2, selM.y + selM.bh/2];
+            let [cc_x, cc_y] = s.core_center;
+
+            // Ph 3: EM Core
+            let vEM = [];
+            for(let y=0; y<rows; y++) {
+                for(let x=0; x<cols; x++) {
+                    for(let ev of eVars) {
+                        if (isFree(s.matrix, cols, rows, x, y, ev.bw, ev.bh)) {
+                            let tSp = false;
+                            for(let pt of ev.parts) {
+                                if(pt[4]===8 && touchesSpecific(s.matrix, cols, rows, x+pt[0], y+pt[1], pt[2], pt[3], [5])) tSp = true;
+                            }
+                            if(tSp) {
+                                let xo = Math.max(0, Math.min(selM.x+selM.bw, x+ev.bw) - Math.max(selM.x, x));
+                                let yo = Math.max(0, Math.min(selM.y+selM.bh, y+ev.bh) - Math.max(selM.y, y));
+                                let xd = Math.min(Math.abs(x - (selM.x+selM.bw)), Math.abs(selM.x - (x+ev.bw)));
+                                let yd = Math.min(Math.abs(y - (selM.y+selM.bh)), Math.abs(selM.y - (y+ev.bh)));
+                                if((xo>0 && yd===c_w) || (yo>0 && xd===c_w)) vEM.push({x:x, y:y, p:ev.parts, bw:ev.bw, bh:ev.bh});
+                            }
+                        }
+                    }
+                }
+            }
+            if(vEM.length > 0) {
+                let e = rng.choice(vEM);
+                for(let pt of e.p) placeRoom(s, e.x+pt[0], e.y+pt[1], pt[2], pt[3], pt[4], pt[5]);
+            } else continue;
+
+            // Ph 4: Stairs & MEP
+            for (let sq of sQ) {
+                let vs = [];
+                for(let [ow, oh] of [[sq[0], sq[1]], [sq[1], sq[0]]]) {
+                    for(let y=0; y<=rows-oh; y++) {
+                        for(let x=0; x<=cols-ow; x++) {
+                            if (isFree(s.matrix, cols, rows, x, y, ow, oh) && touchesSpecific(s.matrix, cols, rows, x, y, ow, oh, [5])) {
+                                vs.push({x:x, y:y, w:ow, h:oh, c:countContactEdges(s.matrix,cols,rows,x,y,ow,oh)});
+                            }
+                        }
+                    }
+                }
+                if(!vs.length) { ok=false; break; }
+                vs.sort((a,b) => -a.c === -b.c ? (Math.abs(a.x+a.w/2-cc_x)+Math.abs(a.y+a.h/2-cc_y)) - (Math.abs(b.x+b.w/2-cc_x)+Math.abs(b.y+b.h/2-cc_y)) : -a.c - -b.c);
+                let sp = rng.choice(vs.slice(0, 2));
+                placeRoom(s, sp.x, sp.y, sp.w, sp.h, sq[2], sq[3]);
+            }
+            if(!ok) continue;
+
+            for(let mq of mepQ) {
+                let vs = [];
+                let seen = new Set();
+                let uOpts = [];
+                for(let o of mq[0]) { let k=`${o[0]},${o[1]}`; if(!seen.has(k)){seen.add(k); uOpts.push(o);} }
+                for(let [ow,oh] of uOpts) {
+                    for(let y=0; y<=rows-oh; y++) {
+                        for(let x=0; x<=cols-ow; x++) {
+                            if(isFree(s.matrix,cols,rows,x,y,ow,oh) && touchesSpecific(s.matrix,cols,rows,x,y,ow,oh,[5,8])) {
+                                vs.push({x:x, y:y, w:ow, h:oh, c:countContactEdges(s.matrix,cols,rows,x,y,ow,oh)});
+                            }
+                        }
+                    }
+                }
+                if(!vs.length){ ok=false; break; }
+                vs.sort((a,b) => -a.c === -b.c ? (Math.abs(a.x+a.w/2-cc_x)+Math.abs(a.y+a.h/2-cc_y)) - (Math.abs(b.x+b.w/2-cc_x)+Math.abs(b.y+b.h/2-cc_y)) : -a.c - -b.c);
+                let sp = rng.choice(vs.slice(0, 3));
+                placeRoom(s, sp.x, sp.y, sp.w, sp.h, mq[1], mq[2]);
+            }
+            if(!ok) continue;
+
+            // Ph 5: Units
+            for(let uq of uQ) {
+                let vs = [];
+                let seen = new Set();
+                let uOpts = [];
+                for(let o of uq[0]) { let k=`${o[0]},${o[1]}`; if(!seen.has(k)){seen.add(k); uOpts.push(o);} }
+                for(let [ow,oh] of uOpts) {
+                    for(let [w,h] of [[ow,oh],[oh,ow]]) {
+                        for(let y=0; y<=rows-h; y++) {
+                            for(let x=0; x<=cols-w; x++) {
+                                if(isFree(s.matrix,cols,rows,x,y,w,h) && touchesSpecific(s.matrix,cols,rows,x,y,w,h,[5],min_unit_door_c)) {
+                                    vs.push({x:x, y:y, w:w, h:h, c:countContactEdges(s.matrix,cols,rows,x,y,w,h)});
+                                }
+                            }
+                        }
+                    }
+                }
+                if(!vs.length){ ok=false; break; }
+                vs.sort((a,b) => -a.c === -b.c ? (Math.abs(a.x+a.w/2-cc_x)+Math.abs(a.y+a.h/2-cc_y)) - (Math.abs(b.x+b.w/2-cc_x)+Math.abs(b.y+b.h/2-cc_y)) : -a.c - -b.c);
+                let sp = rng.choice(vs.slice(0, 3));
+                placeRoom(s, sp.x, sp.y, sp.w, sp.h, uq[1], uq[2]);
+            }
+
+            if (ok) {
+                // Ph 6: Gravitational Pull & Prune
+                let moved = true;
+                while (moved) {
+                    moved = false;
+                    for (let r of s.rooms) {
+                        if ([3,4,7,9].includes(r.rid)) {
+                            let bDx=0, bDy=0, minD=Math.abs(r.x+r.w/2-cc_x)+Math.abs(r.y+r.h/2-cc_y);
+                            let trg = r.rid===9 ? [1,5,8] : [1,5];
+                            let req = r.rid===4 ? min_unit_door_c : 1;
+                            
+                            for(let [dx,dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+                                let nx=r.x+dx, ny=r.y+dy;
+                                let can = true;
+                                if(nx<0 || ny<0 || nx+r.w>cols || ny+r.h>rows) can = false;
+                                else {
+                                    for(let y=ny; y<ny+r.h; y++){
+                                        for(let x=nx; x<nx+r.w; x++){
+                                            if(s.matrix[y][x]!==0 && !(x>=r.x && x<r.x+r.w && y>=r.y && y<r.y+r.h)){ can=false; break; }
+                                        }
+                                        if(!can) break;
+                                    }
+                                }
+                                if(can && touchesSpecific(s.matrix, cols, rows, nx, ny, r.w, r.h, trg, req)) {
+                                    let nd = Math.abs(nx+r.w/2-cc_x)+Math.abs(ny+r.h/2-cc_y);
+                                    if(nd < minD) { minD=nd; bDx=dx; bDy=dy; }
+                                }
+                            }
+                            if(bDx!==0 || bDy!==0) {
+                                for(let y=r.y; y<r.y+r.h; y++) for(let x=r.x; x<r.x+r.w; x++) s.matrix[y][x]=0;
+                                r.x+=bDx; r.y+=bDy;
+                                for(let y=r.y; y<r.y+r.h; y++) for(let x=r.x; x<r.x+r.w; x++) s.matrix[y][x]=r.rid;
+                                moved = true;
+                            }
+                        }
+                    }
+                }
+
+                let pChg = true;
+                while(pChg) {
+                    pChg = false;
+                    for(let y=0; y<rows; y++){
+                        for(let x=0; x<cols; x++){
+                            if(s.matrix[y][x]===5) {
+                                let cN=0, rN=0;
+                                for(let [dx,dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+                                    let nx=x+dx, ny=y+dy;
+                                    if(nx>=0 && nx<cols && ny>=0 && ny<rows) {
+                                        let v = s.matrix[ny][nx];
+                                        if(v===5 || v===1) cN++;
+                                        else if(v!==0) rN++;
+                                    }
+                                }
+                                if(rN===0 && cN<=1) { s.matrix[y][x]=0; pChg=true; }
+                            }
+                        }
+                    }
+                }
+
+                // Ph 6E: Balcony Generation
+                let dirs = [0, 1, 2, 3];
+                dirs.sort((a,b) => Math.min(Math.abs(a-actual_view), 4-Math.abs(a-actual_view)) - Math.min(Math.abs(b-actual_view), 4-Math.abs(b-actual_view)));
+                
+                let curRooms = [...s.rooms];
+                for(let r of curRooms) {
+                    if(r.rid===4) {
+                        let tbc = r.w * r.h * 0.10;
+                        let rlen = Math.max(1, Math.ceil(tbc / bal_d_c));
+                        for(let d of dirs) {
+                            if(d===0) { let el=Math.min(rlen,r.w); if(isFree(s.matrix,cols,rows,r.x,r.y+r.h,el,bal_d_c)) { placeRoom(s,r.x,r.y+r.h,el,bal_d_c,10,`Bal_${r.name}_${d}`); break;} }
+                            else if(d===1) { let el=Math.min(rlen,r.h); if(isFree(s.matrix,cols,rows,r.x+r.w,r.y,bal_d_c,el)) { placeRoom(s,r.x+r.w,r.y,bal_d_c,el,10,`Bal_${r.name}_${d}`); break;} }
+                            else if(d===2) { let el=Math.min(rlen,r.w); if(isFree(s.matrix,cols,rows,r.x,r.y-bal_d_c,el,bal_d_c)) { placeRoom(s,r.x,r.y-bal_d_c,el,bal_d_c,10,`Bal_${r.name}_${d}`); break;} }
+                            else if(d===3) { let el=Math.min(rlen,r.h); if(isFree(s.matrix,cols,rows,r.x-bal_d_c,r.y,bal_d_c,el)) { placeRoom(s,r.x-bal_d_c,r.y,bal_d_c,el,10,`Bal_${r.name}_${d}`); break;} }
+                        }
+                    }
+                }
+
+                let rminx=Infinity, rminy=Infinity, rmaxx=-Infinity, rmaxy=-Infinity;
+                for(let r of s.rooms) {
+                    if(r.rid!==10){
+                        if(r.x<rminx) rminx=r.x; if(r.y<rminy) rminy=r.y;
+                        if(r.x+r.w>rmaxx) rmaxx=r.x+r.w; if(r.y+r.h>rmaxy) rmaxy=r.y+r.h;
+                    }
+                }
+                for(let y=0; y<rows; y++) for(let x=0; x<cols; x++) {
+                    if(s.matrix[y][x]===5 && (x<rminx || x>=rmaxx || y<rminy || y>=rmaxy)) s.matrix[y][x]=0;
+                }
+
+                for(let r of s.rooms){
+                    if([3,7].includes(r.rid) && !touchesSpecific(s.matrix,cols,rows,r.x,r.y,r.w,r.h,[1,5])) {ok=false; break;}
+                    if(r.rid===4 && !touchesSpecific(s.matrix,cols,rows,r.x,r.y,r.w,r.h,[1,5],min_unit_door_c)) {ok=false; break;}
+                }
+                if(!ok) continue;
+
+                let [tScore, sDet] = evaluateLayout(s, cols, rows, g_size, p.max_dist, p.w_struct, p.w_circ, p.w_clim, p.force_rect, min_unit_door_c, actual_view);
+                s.score = tScore;
+                s.score_details = sDet;
+
+                if (!currS) { currS = s; bestGS = s.clone(); }
+                else {
+                    let d = s.score - currS.score;
+                    if(d > 0) {
+                        currS = s;
+                        if(currS.score > bestGS.score) bestGS = currS.clone();
+                    } else {
+                        if (rng.next() < Math.exp(d / T)) currS = s;
+                    }
+                }
+                T *= cRate;
+            }
+        }
+
+        if (bestGS) {
+            for(let r of bestGS.rooms) {
+                if([4,9].includes(r.rid)) {
+                    if(isFree(bestGS.matrix,cols,rows,r.x+r.w,r.y,1,r.h)) {
+                        for(let y=r.y; y<r.y+r.h; y++) bestGS.matrix[y][r.x+r.w]=r.rid;
+                        r.expand(0,0,1,0);
+                    }
+                    if(isFree(bestGS.matrix,cols,rows,r.x,r.y+r.h,r.w,1)) {
+                        for(let x=r.x; x<r.x+r.w; x++) bestGS.matrix[r.y+r.h][x]=r.rid;
+                        r.expand(0,0,0,1);
+                    }
+                }
+            }
+        }
+        return bestGS || new LayoutState(cols, rows);
+    }
+
+    // --- UI Update and Rendering ---
+    function syncLabels() {
+        document.querySelectorAll('input[type=range]').forEach(input => {
+            document.getElementById(input.id + '_val').innerText = input.value;
+            input.addEventListener('input', e => {
+                document.getElementById(input.id + '_val').innerText = e.target.value;
+            });
+        });
+    }
+
+    function getParams() {
+        return {
+            seed: currentSeed,
+            g_size: parseFloat(document.getElementById('g_size').value),
+            b_w: parseInt(document.getElementById('b_w').value),
+            b_h: parseInt(document.getElementById('b_h').value),
+            force_rect: document.getElementById('force_rect').checked,
+            spine_type: parseInt(document.getElementById('spine_type').value),
+            entrance_dir: parseInt(document.getElementById('entrance_dir').value),
+            view_dir: parseInt(document.getElementById('view_dir').value),
+            max_dist: parseInt(document.getElementById('max_dist').value),
+            iters: parseInt(document.getElementById('iters').value),
+            n_units: parseInt(document.getElementById('n_units').value),
+            u_area: parseFloat(document.getElementById('u_area').value),
+            u_aspect_max: parseFloat(document.getElementById('u_aspect_max').value),
+            n_pass_elev: parseInt(document.getElementById('n_pass_elev').value),
+            e_w: parseInt(document.getElementById('e_w').value),
+            e_d: parseInt(document.getElementById('e_d').value),
+            n_reg_stair: parseInt(document.getElementById('n_reg_stair').value),
+            n_em_elev: parseInt(document.getElementById('n_em_elev').value),
+            n_esc_stair: parseInt(document.getElementById('n_esc_stair').value),
+            s_w: parseInt(document.getElementById('s_w').value),
+            s_d: parseInt(document.getElementById('s_d').value),
+            l_w: parseInt(document.getElementById('l_w').value),
+            l_d: parseInt(document.getElementById('l_d').value),
+            mep_area: parseFloat(document.getElementById('mep_area').value),
+            w_struct: parseFloat(document.getElementById('w_struct').value),
+            w_circ: parseFloat(document.getElementById('w_circ').value),
+            w_clim: parseFloat(document.getElementById('w_clim').value)
+        };
+    }
+
+    function render(state, params) {
+        const canvas = document.getElementById('mainCanvas');
+        const ctx = canvas.getContext('2d');
+        const parent = canvas.parentElement;
+        
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = parent.clientWidth * dpr;
+        canvas.height = parent.clientHeight * dpr;
+        ctx.scale(dpr, dpr);
+        
+        const canvasW = parent.clientWidth;
+        const canvasH = parent.clientHeight;
+        
+        ctx.clearRect(0, 0, canvasW, canvasH);
+        
+        let cols = Math.max(1, Math.ceil(params.b_w / params.g_size));
+        let rows = Math.max(1, Math.ceil(params.b_h / params.g_size));
+        
+        const padding = 60;
+        const availW = canvasW - padding * 2;
+        const availH = canvasH - padding * 2;
+        const scale = Math.min(availW / cols, availH / rows);
+        
+        const offsetX = (canvasW - cols * scale) / 2;
+        const offsetY = canvasH - (canvasH - rows * scale) / 2; // Y up
+        
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(offsetX, offsetY - rows * scale, cols * scale, rows * scale);
+        
+        // Grid Lines
+        ctx.strokeStyle = '#E5E5E5';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        for(let i = 0; i <= cols; i++) {
+            let x = Math.round(offsetX + i * scale) + 0.5;
+            ctx.moveTo(x, offsetY); ctx.lineTo(x, offsetY - rows * scale);
+        }
+        for(let j = 0; j <= rows; j++) {
+            let y = Math.round(offsetY - j * scale) + 0.5;
+            ctx.moveTo(offsetX, y); ctx.lineTo(offsetX + cols * scale, y);
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Colors
+        const colors = {
+            1: '#F2E8CF', // Lobby (Creamy)
+            2: '#D3D9D9', // Lift (Soft Grey)
+            3: '#E6D3C9', // Stair (Pale Peach)
+            4: '#D4DFD8', // Unit (Tranquil Dawn)
+            5: '#FCE271', // Corridor (Yellow mandatory)
+            6: '#C5CBCB', // Em Lift
+            7: '#E6D3C9', // Esc Stair
+            8: '#E2DFDA', // Smoke Vest
+            9: '#D9D9D9', // MEP
+            10: '#C5D1D9' // Balcony (Denim drift pale)
+        };
+
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 1.5;
+
+        // Draw Corridors (from matrix) since they might not be in state.rooms
+        for(let y=0; y<rows; y++) {
+            for(let x=0; x<cols; x++) {
+                if(state.matrix[y][x] === 5) {
+                    let rx = offsetX + x * scale;
+                    let ry = offsetY - (y+1) * scale;
+                    ctx.fillStyle = colors[5];
+                    ctx.beginPath(); ctx.rect(rx, ry, scale, scale);
+                    ctx.fill(); ctx.stroke();
+                }
+            }
+        }
+
+        // Draw Rooms
+        for (let r of state.rooms) {
+            let rx = offsetX + r.x * scale;
+            let ry = offsetY - (r.y + r.h) * scale;
+            let rw = r.w * scale;
+            let rh = r.h * scale;
+            
+            ctx.fillStyle = colors[r.rid] || '#333333';
+            ctx.beginPath(); ctx.rect(rx, ry, rw, rh);
+            ctx.fill(); ctx.stroke();
+            
+            let label = r.name.split('_')[0]; 
+            if (r.rid === 10) label = "Balcony";
+            
+            ctx.fillStyle = '#000000';
+            let fSize = Math.max(8, Math.min(12, Math.min(rw, rh) / 3));
+            ctx.font = `600 ${fSize}px 'Inter', sans-serif`;
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            if (rw > 20 && rh > 15 && r.rid !== 5) {
+                ctx.fillText(label, rx + rw / 2, ry + rh / 2);
+            }
+        }
+
+        // Stats updates
+        document.getElementById('scoreStats').innerHTML = `
+            <div class="stat-item"><span>Total Score</span> <span>${state.score === -Infinity ? 'Failed' : state.score.toFixed(0)}</span></div>
+            <div class="stat-item"><span>Struct Score</span> <span>${state.score_details[0].toFixed(0)}</span></div>
+            <div class="stat-item"><span>Circ Score</span> <span>${state.score_details[1].toFixed(0)}</span></div>
+            <div class="stat-item"><span>Clim Score</span> <span>${state.score_details[2].toFixed(0)}</span></div>
+        `;
+
+        let unitStatsDiv = document.getElementById('unitStats');
+        unitStatsDiv.innerHTML = '';
+        if(state.unit_distances && state.unit_names) {
+            for (let i = 0; i < state.unit_distances.length; i++) {
+                let div = document.createElement('div');
+                div.className = 'stat-item';
+                div.innerHTML = `<span>${state.unit_names[i].replace('_', ' ')}</span> <span>${state.unit_distances[i].toFixed(1)}m</span>`;
+                unitStatsDiv.appendChild(div);
+            }
+        }
+    }
+
+    async function triggerGeneration() {
+        const btn = document.getElementById('generateBtn');
+        const overlay = document.getElementById('loading-overlay');
+        btn.disabled = true;
+        overlay.style.display = 'flex';
+        
+        // Small delay to allow UI to paint overlay
+        await new Promise(r => setTimeout(r, 10));
+
+        try {
+            let params = getParams();
+            let finalState = await runAlgorithmAsync(params);
+            render(finalState, params);
+        } catch (e) {
+            console.error(e);
+            alert("An error occurred during generation.");
+        }
+
+        btn.disabled = false;
+        overlay.style.display = 'none';
+    }
+
+    document.getElementById('generateBtn').addEventListener('click', triggerGeneration);
+    
+    document.getElementById('randomSeedBtn').addEventListener('click', () => {
+        currentSeed = Math.floor(Math.random() * 10000);
+        document.getElementById('seedDisplay').innerText = currentSeed;
+        triggerGeneration();
+    });
+
+    window.addEventListener('resize', () => {
+        if (!document.getElementById('generateBtn').disabled) {
+            triggerGeneration(); 
+        }
+    });
+
+    syncLabels();
+    triggerGeneration();
+
+</script>
+</body>
+</html>
